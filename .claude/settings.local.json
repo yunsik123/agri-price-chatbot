@@ -9,7 +9,15 @@
       "Bash(python:*)",
       "Bash(curl:*)",
       "Bash(powershell -Command \"Invoke-RestMethod -Uri ''http://localhost:8000/api/query'' -Method POST -ContentType ''application/json'' -Body ''{\"\"filters\"\": {\"\"item_name\"\": \"\"감자\"\", \"\"date_from\"\": \"\"2018-01-01\"\", \"\"date_to\"\": \"\"2018-03-31\"\"}}'' | ConvertTo-Json -Depth 3 | Select-String -Pattern ''type|latest_price'' | Select-Object -First 5\")",
-      "Bash(powershell -Command \"Invoke-RestMethod -Uri ''http://localhost:8000/api/dimensions'' -Method GET | ConvertTo-Json -Depth 2 | Select-Object -First 10\")"
+      "Bash(powershell -Command \"Invoke-RestMethod -Uri ''http://localhost:8000/api/dimensions'' -Method GET | ConvertTo-Json -Depth 2 | Select-Object -First 10\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add web frontend, local server, and AWS SAM deployment\n\n- Add split-panel web UI \\(dashboard + chat interface\\)\n- Add FastAPI local development server\n- Add AWS SAM template for serverless deployment\n- Add deployment scripts \\(PowerShell/Bash\\)\n- Update .gitignore for AWS and Python artifacts\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(sam:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File deploy_aws.ps1 -Stage prod -Region ap-southeast-2)",
+      "Bash(echo:*)",
+      "Bash(unzip:*)",
+      "Bash(MSYS_NO_PATHCONV=1 aws logs describe-log-streams:*)",
+      "Bash(MSYS_NO_PATHCONV=1 aws logs get-log-events:*)",
+      "Bash(git add:*)"
     ]
   }
 }

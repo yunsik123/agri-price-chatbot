@@ -3,7 +3,22 @@
 ## 프로젝트 개요
 - **리전**: ap-southeast-2
 - **Bedrock 모델**: amazon.titan-text-express-v1 (Claude 계열 사용 안함)
-- **Lambda**: agri-bedrock-chat (Python 3.10, Timeout 20초)
+- **Lambda**: agri-bedrock-chat-prod (Python 3.10, Timeout 30초, 512MB)
+- **아키텍처**: Serverless (S3 + API Gateway + Lambda + Bedrock)
+
+## 배포된 리소스
+
+| 서비스 | 리소스명/ID | 설명 |
+|--------|-------------|------|
+| **S3** | agri-chatbot-frontend-260893304786-prod | 정적 웹 호스팅 |
+| **Lambda** | agri-bedrock-chat-prod | 백엔드 API 핸들러 |
+| **API Gateway** | xqrsjykrnb | HTTP API |
+| **Lambda Layer** | AWSSDKPandas-Python310 | pandas/numpy 라이브러리 |
+| **IAM Role** | agri-chatbot-lambda-role-prod | Lambda 실행 역할 |
+
+### 접속 URL
+- **웹사이트**: http://agri-chatbot-frontend-260893304786-prod.s3-website-ap-southeast-2.amazonaws.com
+- **API Endpoint**: https://xqrsjykrnb.execute-api.ap-southeast-2.amazonaws.com/prod/api/query
 
 ## 핵심 원칙
 - **LLM은 SQL을 직접 생성/실행하지 않음**
@@ -14,8 +29,56 @@
 
 ## A. 아키텍처/모듈 구조
 
+### 시스템 아키텍처
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        사용자 브라우저                            │
+│  ┌─────────────────────┐    ┌─────────────────────────────────┐ │
+│  │   대시보드 (좌측)     │    │     AI 채팅 (우측)              │ │
+│  │  - 메트릭 카드       │    │  - 자연어 질문                  │ │
+│  │  - 가격 차트         │    │  - 응답 표시                    │ │
+│  │  - 반입량 차트       │    │  - Clarification UI            │ │
+│  └─────────────────────┘    └─────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    S3 Static Website Hosting                     │
+│                 (frontend/index.html + Plotly.js)                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    API Gateway (HTTP API)                        │
+│                POST /api/query, GET /api/health                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Lambda Function                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐ │
+│  │   NLU    │→ │  Query   │→ │ Features │→ │    Narrative     │ │
+│  │(Bedrock) │  │(pandas)  │  │(summary) │  │   (Bedrock)      │ │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────────┘ │
+│                      │                                           │
+│              ┌───────▼───────┐                                   │
+│              │  CSV 데이터    │                                   │
+│              │ (Lambda 내장)  │                                   │
+│              └───────────────┘                                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Amazon Bedrock                                │
+│                 (Titan Text Express v1)                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 프로젝트 폴더 구조
 ```
 aws_agri/
+├── frontend/
+│   └── index.html          # 웹 UI (대시보드 + 채팅)
 ├── lambdas/agri_api/
 │   ├── app.py              # Lambda 핸들러(메인)
 │   └── requirements.txt
@@ -27,9 +90,12 @@ aws_agri/
 │   ├── features.py         # WoW/MoM/변동성/급등락 등 요약지표 생성
 │   └── narrative.py        # series/summary 기반 설명 프롬프트 + Titan 호출
 ├── streamlit_app/
-│   └── app.py              # Streamlit 대시보드
+│   └── app.py              # Streamlit 대시보드 (레거시)
 ├── tests/                  # pytest 테스트
 ├── data/                   # CSV 데이터
+├── local_server.py         # 로컬 개발 서버 (FastAPI)
+├── deploy_aws.ps1          # AWS 배포 스크립트
+├── template.yaml           # SAM 템플릿
 └── README.md
 ```
 
