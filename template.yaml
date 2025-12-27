@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Agricultural Price Analysis Chatbot - AWS SAM Template
+
+Parameters:
+  Stage:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - dev
+      - prod
+    Description: Deployment stage
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.10
+    MemorySize: 512
+    Environment:
+      Variables:
+        DATA_PATH: /var/task/data/sample_agri_prices.csv
+        BEDROCK_MODEL_ID: amazon.titan-text-express-v1
+        AWS_REGION_NAME: ap-southeast-2
+
+Resources:
+  # ============================================================
+  # S3 Bucket for Frontend Static Hosting
+  # ============================================================
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'agri-chatbot-frontend-${AWS::AccountId}-${Stage}'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET]
+            AllowedOrigins: ['*']
+            MaxAge: 3600
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+
+  # ============================================================
+  # CloudFront Distribution
+  # ============================================================
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          # S3 Origin for Frontend
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+          # API Gateway Origin
+          - Id: ApiGatewayOrigin
+            DomainName: !Sub '${AgriApi}.execute-api.${AWS::Region}.amazonaws.com'
+            OriginPath: !Sub '/${Stage}'
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+          MinTTL: 0
+        CacheBehaviors:
+          # API Path - No caching
+          - PathPattern: '/api/*'
+            TargetOriginId: ApiGatewayOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachedMethods: [GET, HEAD]
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - Content-Type
+                - Authorization
+              Cookies:
+                Forward: none
+            DefaultTTL: 0
+            MaxTTL: 0
+            MinTTL: 0
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        PriceClass: PriceClass_100
+        HttpVersion: http2
+
+  # ============================================================
+  # Lambda Function
+  # ============================================================
+  AgriChatbotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'agri-bedrock-chat-${Stage}'
+      Handler: lambdas.agri_api.app.handler
+      CodeUri: .
+      Description: Agricultural price analysis chatbot Lambda function
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: '*'
+      Events:
+        ApiQuery:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AgriApi
+            Path: /api/query
+            Method: POST
+        ApiQueryOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AgriApi
+            Path: /api/query
+            Method: OPTIONS
+
+  # ============================================================
+  # API Gateway
+  # ============================================================
+  AgriApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub 'agri-chatbot-api-${Stage}'
+      StageName: !Ref Stage
+      Cors:
+        AllowMethods: "'OPTIONS,POST,GET'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
+      EndpointConfiguration:
+        Type: REGIONAL
+
+Outputs:
+  # S3 Website URL
+  S3WebsiteURL:
+    Description: S3 Static Website URL
+    Value: !GetAtt FrontendBucket.WebsiteURL
+
+  # CloudFront URL
+  CloudFrontURL:
+    Description: CloudFront Distribution URL (Use this!)
+    Value: !Sub 'https://${CloudFrontDistribution.DomainName}'
+
+  # API Gateway URL
+  ApiGatewayURL:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${AgriApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/api/query'
+
+  # Lambda Function ARN
+  LambdaFunctionArn:
+    Description: Lambda Function ARN
+    Value: !GetAtt AgriChatbotFunction.Arn
+
+  # S3 Bucket Name
+  FrontendBucketName:
+    Description: S3 Bucket Name for frontend deployment
+    Value: !Ref FrontendBucket

@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>농산물 가격 분석 챗봇</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* 왼쪽: 대시보드 */
+        .dashboard {
+            flex: 1.5;
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .dashboard-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .dashboard-header h1 {
+            font-size: 24px;
+            color: #333;
+        }
+
+        .dashboard-header .icon {
+            font-size: 32px;
+        }
+
+        /* 메트릭 카드 */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1f77b4;
+            margin-bottom: 4px;
+        }
+
+        .metric-label {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .metric-delta {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .metric-delta.positive { color: #28a745; }
+        .metric-delta.negative { color: #dc3545; }
+
+        /* 차트 영역 */
+        .charts-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            min-height: 300px;
+        }
+
+        .chart-box {
+            background: #fafafa;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #eee;
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #444;
+            margin-bottom: 12px;
+        }
+
+        .chart-placeholder {
+            height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 14px;
+        }
+
+        /* 내러티브 */
+        .narrative-box {
+            background: linear-gradient(135deg, #e8f4fd 0%, #d4e8f7 100%);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: auto;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .narrative-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1976d2;
+            margin-bottom: 8px;
+        }
+
+        .narrative-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* 오른쪽: 채팅 */
+        .chat-panel {
+            flex: 1;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .chat-header h2 {
+            font-size: 18px;
+            margin-bottom: 4px;
+        }
+
+        .chat-header p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        /* 예시 질문 */
+        .example-questions {
+            padding: 16px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+
+        .example-questions h4 {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .example-btn {
+            display: block;
+            width: 100%;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            text-align: left;
+            font-size: 13px;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .example-btn:last-child {
+            margin-bottom: 0;
+        }
+
+        /* 채팅 메시지 영역 */
+        .chat-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.bot {
+            align-self: flex-start;
+            background: #f0f0f0;
+            color: #333;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .message.loading {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        /* 입력 영역 */
+        .chat-input-container {
+            padding: 16px;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 14px 16px;
+            border: 2px solid #ddd;
+            border-radius: 24px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input:focus {
+            border-color: #667eea;
+        }
+
+        .send-btn {
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Clarification UI */
+        .clarify-container {
+            background: #fff8e1;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 8px 0;
+        }
+
+        .clarify-question {
+            font-size: 14px;
+            font-weight: 600;
+            color: #f57c00;
+            margin-bottom: 12px;
+        }
+
+        .clarify-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .clarify-option {
+            padding: 10px 14px;
+            background: white;
+            border: 1px solid #ffcc80;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .clarify-option:hover {
+            background: #ff9800;
+            color: white;
+            border-color: #ff9800;
+        }
+
+        /* 로딩 애니메이션 */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 8px 0;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* 반응형 */
+        @media (max-width: 1200px) {
+            .container {
+                flex-direction: column;
+            }
+            .dashboard, .chat-panel {
+                flex: none;
+                height: 50vh;
+            }
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .chart-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 왼쪽: 대시보드 -->
+        <div class="dashboard">
+            <div class="dashboard-header">
+                <span class="icon">🌾</span>
+                <h1>농산물 가격 분석 대시보드</h1>
+            </div>
+
+            <!-- 메트릭 카드 -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-price">-</div>
+                    <div class="metric-label">최근 가격 (원/kg)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-volume">-</div>
+                    <div class="metric-label">최근 반입량 (kg)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-wow">-</div>
+                    <div class="metric-label">전주 대비</div>
+                    <div class="metric-delta" id="metric-wow-delta"></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-volatility">-</div>
+                    <div class="metric-label">변동성 (14일)</div>
+                </div>
+            </div>
+
+            <!-- 차트 영역 -->
+            <div class="charts-container">
+                <div class="chart-row">
+                    <div class="chart-box">
+                        <div class="chart-title">📈 가격 추세</div>
+                        <div id="price-chart" class="chart-placeholder">질문을 입력하면 차트가 표시됩니다</div>
+                    </div>
+                    <div class="chart-box">
+                        <div class="chart-title">📊 반입량</div>
+                        <div id="volume-chart" class="chart-placeholder">질문을 입력하면 차트가 표시됩니다</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 내러티브 -->
+            <div class="narrative-box" id="narrative-box" style="display: none;">
+                <div class="narrative-title">📝 분석 설명</div>
+                <div class="narrative-content" id="narrative-content"></div>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 채팅 -->
+        <div class="chat-panel">
+            <div class="chat-header">
+                <h2>🤖 AI 분석 어시스턴트</h2>
+                <p>자연어로 질문하세요</p>
+            </div>
+
+            <!-- 예시 질문 -->
+            <div class="example-questions">
+                <h4>💡 예시 질문</h4>
+                <button class="example-btn" onclick="sendExample(this.textContent)">감자 수미, 최근 6개월 가격 추세 보여줘</button>
+                <button class="example-btn" onclick="sendExample(this.textContent)">양파, 2019년 가격과 반입량 같이 보여줘</button>
+                <button class="example-btn" onclick="sendExample(this.textContent)">배추, 최근 3개월 변동성 큰 구간 알려줘</button>
+                <button class="example-btn" onclick="sendExample(this.textContent)">마늘, 시장별 비교해줘</button>
+            </div>
+
+            <!-- 채팅 메시지 -->
+            <div class="chat-messages" id="chat-messages">
+                <div class="message bot">
+                    안녕하세요! 농산물 가격 분석 챗봇입니다. 🌾<br><br>
+                    궁금한 품목의 가격, 추세, 변동성 등을 자연어로 질문해주세요.
+                </div>
+            </div>
+
+            <!-- 입력 -->
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <input type="text" class="chat-input" id="chat-input"
+                           placeholder="예: 감자 수미, 최근 6개월 가격 추세 보여줘"
+                           onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" id="send-btn" onclick="sendMessage()">전송</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API 엔드포인트 설정
+        const API_ENDPOINT = window.API_ENDPOINT || '/api/query';
+
+        let currentQuestion = '';
+        let isLoading = false;
+
+        // 메시지 전송
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const question = input.value.trim();
+
+            if (!question || isLoading) return;
+
+            currentQuestion = question;
+            input.value = '';
+
+            addMessage(question, 'user');
+            showLoading();
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+                hideLoading();
+                handleResponse(data);
+
+            } catch (error) {
+                hideLoading();
+                addMessage('서버 연결 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'bot error');
+                console.error('API Error:', error);
+            }
+        }
+
+        // 예시 질문 전송
+        function sendExample(text) {
+            document.getElementById('chat-input').value = text;
+            sendMessage();
+        }
+
+        // 응답 처리
+        function handleResponse(data) {
+            if (data.error) {
+                addMessage(`오류: ${data.error.message || '알 수 없는 오류'}`, 'bot error');
+                return;
+            }
+
+            if (data.type === 'clarify') {
+                showClarification(data.clarification);
+                return;
+            }
+
+            // 성공 응답
+            const filters = data.filters || {};
+            const series = data.series || [];
+            const summary = data.summary || {};
+            const narrative = data.narrative || '';
+
+            // 메트릭 업데이트
+            updateMetrics(summary);
+
+            // 차트 렌더링
+            if (series.length > 0) {
+                renderPriceChart(series, filters);
+                renderVolumeChart(series, filters);
+            }
+
+            // 내러티브 표시
+            if (narrative) {
+                showNarrative(narrative);
+                addMessage(narrative, 'bot');
+            } else {
+                addMessage(`${filters.item_name || '품목'} 분석이 완료되었습니다. 왼쪽 대시보드에서 결과를 확인하세요.`, 'bot');
+            }
+
+            // 경고 메시지
+            if (data.warnings && data.warnings.length > 0) {
+                data.warnings.forEach(w => {
+                    if (w && w.trim()) {
+                        addMessage(`⚠️ ${w}`, 'bot');
+                    }
+                });
+            }
+        }
+
+        // Clarification UI
+        function showClarification(clarification) {
+            const questions = clarification.questions || [];
+            if (questions.length === 0) return;
+
+            const messagesDiv = document.getElementById('chat-messages');
+
+            questions.forEach(q => {
+                const container = document.createElement('div');
+                container.className = 'clarify-container';
+                container.innerHTML = `
+                    <div class="clarify-question">${q.question}</div>
+                    <div class="clarify-options">
+                        ${q.options.map(opt => `
+                            <div class="clarify-option" onclick="answerClarify('${q.id}', '${opt}')">${formatOption(opt)}</div>
+                        `).join('')}
+                    </div>
+                `;
+                messagesDiv.appendChild(container);
+            });
+
+            scrollToBottom();
+        }
+
+        function formatOption(opt) {
+            const labels = {
+                'high_avg_price': '평균가격이 높은',
+                'high_price_change': '가격 상승률이 큰',
+                'high_volatility': '변동성이 큰',
+                '30d': '최근 30일',
+                '90d': '최근 90일',
+                '180d': '최근 6개월'
+            };
+            return labels[opt] || opt;
+        }
+
+        async function answerClarify(id, answer) {
+            showLoading();
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: currentQuestion,
+                        clarify_answers: { [id]: answer }
+                    })
+                });
+
+                const data = await response.json();
+                hideLoading();
+                handleResponse(data);
+
+            } catch (error) {
+                hideLoading();
+                addMessage('서버 연결 오류가 발생했습니다.', 'bot error');
+            }
+        }
+
+        // 메트릭 업데이트
+        function updateMetrics(summary) {
+            const priceEl = document.getElementById('metric-price');
+            const volumeEl = document.getElementById('metric-volume');
+            const wowEl = document.getElementById('metric-wow');
+            const wowDeltaEl = document.getElementById('metric-wow-delta');
+            const volatilityEl = document.getElementById('metric-volatility');
+
+            if (summary.latest_price) {
+                priceEl.textContent = Number(summary.latest_price).toLocaleString();
+            }
+            if (summary.latest_volume) {
+                volumeEl.textContent = Number(summary.latest_volume).toLocaleString();
+            }
+            if (summary.wow_price_pct !== undefined && summary.wow_price_pct !== null) {
+                const pct = summary.wow_price_pct;
+                wowEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+                wowDeltaEl.textContent = pct >= 0 ? '▲ 상승' : '▼ 하락';
+                wowDeltaEl.className = `metric-delta ${pct >= 0 ? 'positive' : 'negative'}`;
+            }
+            if (summary.volatility_14d) {
+                volatilityEl.textContent = Number(summary.volatility_14d).toFixed(0);
+            }
+        }
+
+        // 가격 차트
+        function renderPriceChart(series, filters) {
+            const chartDiv = document.getElementById('price-chart');
+            chartDiv.innerHTML = '';
+
+            const dates = series.map(s => s.date);
+            const prices = series.map(s => s.price);
+
+            const trace = {
+                x: dates,
+                y: prices,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: '가격',
+                line: { color: '#1f77b4', width: 2 },
+                marker: { size: 4 }
+            };
+
+            const layout = {
+                margin: { t: 10, r: 20, b: 40, l: 60 },
+                xaxis: { title: '' },
+                yaxis: { title: '원/kg' },
+                hovermode: 'x unified',
+                showlegend: false
+            };
+
+            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true });
+        }
+
+        // 반입량 차트
+        function renderVolumeChart(series, filters) {
+            const chartDiv = document.getElementById('volume-chart');
+            chartDiv.innerHTML = '';
+
+            const dates = series.map(s => s.date);
+            const volumes = series.map(s => s.volume);
+
+            const trace = {
+                x: dates,
+                y: volumes,
+                type: 'bar',
+                name: '반입량',
+                marker: { color: '#2ca02c' }
+            };
+
+            const layout = {
+                margin: { t: 10, r: 20, b: 40, l: 60 },
+                xaxis: { title: '' },
+                yaxis: { title: 'kg' },
+                hovermode: 'x unified',
+                showlegend: false
+            };
+
+            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true });
+        }
+
+        // 내러티브 표시
+        function showNarrative(text) {
+            const box = document.getElementById('narrative-box');
+            const content = document.getElementById('narrative-content');
+            content.textContent = text;
+            box.style.display = 'block';
+        }
+
+        // 메시지 추가
+        function addMessage(text, type) {
+            const messagesDiv = document.getElementById('chat-messages');
+            const msg = document.createElement('div');
+            msg.className = `message ${type}`;
+            msg.innerHTML = text.replace(/\n/g, '<br>');
+            messagesDiv.appendChild(msg);
+            scrollToBottom();
+        }
+
+        // 로딩 표시
+        function showLoading() {
+            isLoading = true;
+            document.getElementById('send-btn').disabled = true;
+
+            const messagesDiv = document.getElementById('chat-messages');
+            const loading = document.createElement('div');
+            loading.id = 'loading-msg';
+            loading.className = 'message bot loading';
+            loading.innerHTML = `
+                <div class="typing-indicator">
+                    <span></span><span></span><span></span>
+                </div>
+                분석 중...
+            `;
+            messagesDiv.appendChild(loading);
+            scrollToBottom();
+        }
+
+        function hideLoading() {
+            isLoading = false;
+            document.getElementById('send-btn').disabled = false;
+            const loading = document.getElementById('loading-msg');
+            if (loading) loading.remove();
+        }
+
+        function scrollToBottom() {
+            const messagesDiv = document.getElementById('chat-messages');
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+    </script>
+</body>
+</html>

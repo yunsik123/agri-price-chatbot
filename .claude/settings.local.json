@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(aws:*)",
+      "Bash(tasklist:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(powershell -Command \"Invoke-RestMethod -Uri ''http://localhost:8000/api/query'' -Method POST -ContentType ''application/json'' -Body ''{\"\"filters\"\": {\"\"item_name\"\": \"\"감자\"\", \"\"date_from\"\": \"\"2018-01-01\"\", \"\"date_to\"\": \"\"2018-03-31\"\"}}'' | ConvertTo-Json -Depth 3 | Select-String -Pattern ''type|latest_price'' | Select-Object -First 5\")",
+      "Bash(powershell -Command \"Invoke-RestMethod -Uri ''http://localhost:8000/api/dimensions'' -Method GET | ConvertTo-Json -Depth 2 | Select-Object -First 10\")"
+    ]
+  }
+}
