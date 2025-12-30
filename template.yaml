@@ -13,13 +13,13 @@ Parameters:
 
 Globals:
   Function:
-    Timeout: 30
+    Timeout: 60
     Runtime: python3.10
     MemorySize: 512
     Environment:
       Variables:
         DATA_PATH: /var/task/data/sample_agri_prices.csv
-        BEDROCK_MODEL_ID: amazon.titan-text-express-v1
+        BEDROCK_MODEL_ID: amazon.nova-micro-v1:0
         AWS_REGION_NAME: ap-southeast-2
 
 Resources:

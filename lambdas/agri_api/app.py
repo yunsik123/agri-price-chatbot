@@ -230,7 +230,7 @@ def handler(event, context):
 
         narrative = ""
         if filters.get("explain", True):
-            narrative = generate_narrative(filters, series, summary, use_llm=True)
+            narrative = generate_narrative(filters, series, summary, use_llm=False)
 
         # ============================================================
         # 5. 최종 응답 구성
