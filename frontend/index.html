@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,6 +17,8 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            overflow-x: hidden;
+            /* ✅ 가로 튐 방지 */
         }
 
         .container {
@@ -23,6 +26,8 @@
             height: 100vh;
             padding: 20px;
             gap: 20px;
+            min-width: 0;
+            /* ✅ flex 자식 overflow 방지 */
         }
 
         /* 왼쪽: 대시보드 */
@@ -31,10 +36,12 @@
             background: white;
             border-radius: 16px;
             padding: 24px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-width: 0;
+            /* ✅ grid/plotly overflow 방지 */
         }
 
         .dashboard-header {
@@ -73,7 +80,7 @@
 
         .metric-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
         .metric-value {
@@ -93,8 +100,13 @@
             margin-top: 4px;
         }
 
-        .metric-delta.positive { color: #28a745; }
-        .metric-delta.negative { color: #dc3545; }
+        .metric-delta.positive {
+            color: #28a745;
+        }
+
+        .metric-delta.negative {
+            color: #dc3545;
+        }
 
         /* 차트 영역 */
         .charts-container {
@@ -103,13 +115,18 @@
             flex-direction: column;
             gap: 16px;
             overflow-y: auto;
+            min-height: 0;
+            /* ✅ scroll container에서 내부 높이 계산 안정화 */
+            padding-right: 4px;
         }
 
         .chart-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 16px;
-            min-height: 300px;
+            align-items: stretch;
+            min-width: 0;
+            /* ✅ grid overflow 방지 */
         }
 
         .chart-box {
@@ -117,6 +134,11 @@
             border-radius: 12px;
             padding: 16px;
             border: 1px solid #eee;
+
+            /* ✅ Plotly가 부모 박스 기준으로 잡히게 */
+            position: relative;
+            overflow: hidden;
+            min-width: 0;
         }
 
         .chart-title {
@@ -126,13 +148,37 @@
             margin-bottom: 12px;
         }
 
+        /* ✅ placeholder 상태: flex로 텍스트 중앙 정렬 */
         .chart-placeholder {
-            height: 250px;
+            height: 280px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #999;
             font-size: 14px;
+        }
+
+        /* ✅ forecast placeholder는 더 높게 */
+        #forecast-chart.chart-placeholder {
+            height: 360px;
+        }
+
+        /* ✅ 차트가 그려지면 placeholder 해제 → block으로 전환 */
+        .chart-area {
+            height: 280px;
+            width: 100%;
+            display: block;  /* flex 해제 필수! */
+        }
+
+        #forecast-chart.chart-area {
+            height: 360px;
+        }
+
+        /* ✅ Plotly 내부 SVG가 부모를 넘지 않도록 */
+        .chart-area .plotly,
+        .chart-area .js-plotly-plot {
+            width: 100% !important;
+            max-width: 100%;
         }
 
         /* 내러티브 */
@@ -163,10 +209,12 @@
             flex: 1;
             background: white;
             border-radius: 16px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-width: 0;
+            /* ✅ flex overflow 방지 */
         }
 
         .chat-header {
@@ -232,6 +280,7 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
+            min-height: 0;
         }
 
         .message {
@@ -240,6 +289,7 @@
             border-radius: 16px;
             font-size: 14px;
             line-height: 1.5;
+            word-break: break-word;
         }
 
         .message.user {
@@ -367,12 +417,25 @@
             animation: bounce 1.4s infinite ease-in-out;
         }
 
-        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        .typing-indicator span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
 
         @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1);
+            }
         }
 
         /* 예측 테이블 */
@@ -420,20 +483,33 @@
         @media (max-width: 1200px) {
             .container {
                 flex-direction: column;
+                height: auto;
+                min-height: 100vh;
             }
-            .dashboard, .chat-panel {
+
+            .dashboard,
+            .chat-panel {
                 flex: none;
                 height: 50vh;
+                min-height: 400px;
             }
+
             .metrics-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
+
             .chart-row {
                 grid-template-columns: 1fr;
+            }
+
+            /* ✅ 1열 전환 시 span 2 무효화 */
+            .chart-box {
+                grid-column: span 1 !important;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <!-- 왼쪽: 대시보드 -->
@@ -480,7 +556,7 @@
                 <!-- 예측 차트 섹션 -->
                 <div class="chart-row" id="forecast-section">
                     <div class="chart-box" style="grid-column: span 2;">
-                        <div class="chart-title">🔮 3개월 가격 예측 (XGBoost)</div>
+                        <div class="chart-title">🔮 3개월 가격 예측 </div>
                         <div id="forecast-chart" class="chart-placeholder">예측 데이터 로딩 중...</div>
                     </div>
                 </div>
@@ -536,9 +612,8 @@
             <!-- 입력 -->
             <div class="chat-input-container">
                 <div class="chat-input-wrapper">
-                    <input type="text" class="chat-input" id="chat-input"
-                           placeholder="예: 감자 수미, 최근 6개월 가격 추세 보여줘"
-                           onkeypress="handleKeyPress(event)">
+                    <input type="text" class="chat-input" id="chat-input" placeholder="예: 감자 수미, 최근 6개월 가격 추세 보여줘"
+                        onkeypress="handleKeyPress(event)">
                     <button class="send-btn" id="send-btn" onclick="sendMessage()">전송</button>
                 </div>
             </div>
@@ -551,6 +626,27 @@
 
         let currentQuestion = '';
         let isLoading = false;
+
+        // ✅ plotly resize helper (차트가 컨테이너 밖으로 튀는 현상 방지)
+        function safeResize(divId) {
+            const el = document.getElementById(divId);
+            if (!el) return;
+            // Plotly가 붙어있을 때만 resize
+            if (el.classList.contains('js-plotly-plot')) {
+                Plotly.Plots.resize(el);
+            }
+        }
+
+        function resizeAllCharts() {
+            safeResize('price-chart');
+            safeResize('volume-chart');
+            safeResize('forecast-chart');
+        }
+
+        window.addEventListener('resize', () => {
+            // 브라우저 리사이즈 시 재계산
+            resizeAllCharts();
+        });
 
         // 메시지 전송
         async function sendMessage() {
@@ -601,22 +697,18 @@
                 return;
             }
 
-            // 성공 응답
             const filters = data.filters || {};
             const series = data.series || [];
             const summary = data.summary || {};
             const narrative = data.narrative || '';
 
-            // 메트릭 업데이트
             updateMetrics(summary);
 
-            // 차트 렌더링
             if (series.length > 0) {
                 renderPriceChart(series, filters);
                 renderVolumeChart(series, filters);
             }
 
-            // 내러티브 표시
             if (narrative) {
                 showNarrative(narrative);
                 addMessage(narrative, 'bot');
@@ -624,14 +716,14 @@
                 addMessage(`${filters.item_name || '품목'} 분석이 완료되었습니다. 왼쪽 대시보드에서 결과를 확인하세요.`, 'bot');
             }
 
-            // 경고 메시지
             if (data.warnings && data.warnings.length > 0) {
                 data.warnings.forEach(w => {
-                    if (w && w.trim()) {
-                        addMessage(`⚠️ ${w}`, 'bot');
-                    }
+                    if (w && w.trim()) addMessage(`⚠️ ${w}`, 'bot');
                 });
             }
+
+            // ✅ 렌더 직후 한 번 더 resize (scroll container에서 특히 중요)
+            setTimeout(resizeAllCharts, 50);
         }
 
         // Clarification UI
@@ -645,13 +737,13 @@
                 const container = document.createElement('div');
                 container.className = 'clarify-container';
                 container.innerHTML = `
-                    <div class="clarify-question">${q.question}</div>
-                    <div class="clarify-options">
-                        ${q.options.map(opt => `
-                            <div class="clarify-option" onclick="answerClarify('${q.id}', '${opt}')">${formatOption(opt)}</div>
-                        `).join('')}
-                    </div>
-                `;
+                <div class="clarify-question">${q.question}</div>
+                <div class="clarify-options">
+                    ${q.options.map(opt => `
+                        <div class="clarify-option" onclick="answerClarify('${q.id}', '${opt}')">${formatOption(opt)}</div>
+                    `).join('')}
+                </div>
+            `;
                 messagesDiv.appendChild(container);
             });
 
@@ -701,27 +793,33 @@
             const wowDeltaEl = document.getElementById('metric-wow-delta');
             const volatilityEl = document.getElementById('metric-volatility');
 
-            if (summary.latest_price) {
-                priceEl.textContent = Number(summary.latest_price).toLocaleString();
-            }
-            if (summary.latest_volume) {
-                volumeEl.textContent = Number(summary.latest_volume).toLocaleString();
-            }
+            if (summary.latest_price) priceEl.textContent = Number(summary.latest_price).toLocaleString();
+            if (summary.latest_volume) volumeEl.textContent = Number(summary.latest_volume).toLocaleString();
+
             if (summary.wow_price_pct !== undefined && summary.wow_price_pct !== null) {
                 const pct = summary.wow_price_pct;
                 wowEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
                 wowDeltaEl.textContent = pct >= 0 ? '▲ 상승' : '▼ 하락';
                 wowDeltaEl.className = `metric-delta ${pct >= 0 ? 'positive' : 'negative'}`;
             }
-            if (summary.volatility_14d) {
-                volatilityEl.textContent = Number(summary.volatility_14d).toFixed(0);
-            }
+
+            if (summary.volatility_14d) volatilityEl.textContent = Number(summary.volatility_14d).toFixed(0);
+        }
+
+        // ✅ 차트 div 준비: placeholder → chart-area 클래스 교체
+        function prepareChartDiv(divId) {
+            const el = document.getElementById(divId);
+            if (!el) return null;
+            el.innerHTML = '';
+            el.classList.remove('chart-placeholder');
+            el.classList.add('chart-area');
+            return el;
         }
 
         // 가격 차트
         function renderPriceChart(series, filters) {
-            const chartDiv = document.getElementById('price-chart');
-            chartDiv.innerHTML = '';
+            const chartDiv = prepareChartDiv('price-chart');
+            if (!chartDiv) return;
 
             const dates = series.map(s => s.date);
             const prices = series.map(s => s.price);
@@ -732,11 +830,11 @@
                 type: 'scatter',
                 mode: 'lines+markers',
                 name: '가격',
-                line: { color: '#1f77b4', width: 2 },
                 marker: { size: 4 }
             };
 
             const layout = {
+                autosize: true,
                 margin: { t: 10, r: 20, b: 40, l: 60 },
                 xaxis: { title: '' },
                 yaxis: { title: '원/kg' },
@@ -744,13 +842,14 @@
                 showlegend: false
             };
 
-            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true });
+            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true, displayModeBar: false })
+                .then(() => setTimeout(() => safeResize('price-chart'), 30));
         }
 
         // 반입량 차트
         function renderVolumeChart(series, filters) {
-            const chartDiv = document.getElementById('volume-chart');
-            chartDiv.innerHTML = '';
+            const chartDiv = prepareChartDiv('volume-chart');
+            if (!chartDiv) return;
 
             const dates = series.map(s => s.date);
             const volumes = series.map(s => s.volume);
@@ -759,11 +858,11 @@
                 x: dates,
                 y: volumes,
                 type: 'bar',
-                name: '반입량',
-                marker: { color: '#2ca02c' }
+                name: '반입량'
             };
 
             const layout = {
+                autosize: true,
                 margin: { t: 10, r: 20, b: 40, l: 60 },
                 xaxis: { title: '' },
                 yaxis: { title: 'kg' },
@@ -771,7 +870,8 @@
                 showlegend: false
             };
 
-            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true });
+            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true, displayModeBar: false })
+                .then(() => setTimeout(() => safeResize('volume-chart'), 30));
         }
 
         // 내러티브 표시
@@ -802,11 +902,11 @@
             loading.id = 'loading-msg';
             loading.className = 'message bot loading';
             loading.innerHTML = `
-                <div class="typing-indicator">
-                    <span></span><span></span><span></span>
-                </div>
-                분석 중...
-            `;
+            <div class="typing-indicator">
+                <span></span><span></span><span></span>
+            </div>
+            분석 중...
+        `;
             messagesDiv.appendChild(loading);
             scrollToBottom();
         }
@@ -830,7 +930,6 @@
         // ========================================
         // 예측 데이터 관련 함수
         // ========================================
-
         let forecastData = null;
 
         async function loadForecastData() {
@@ -843,33 +942,24 @@
                     forecastData = data.data;
                     renderForecastChart(forecastData);
                     renderForecastTable(forecastData);
+                    setTimeout(resizeAllCharts, 50);
                 }
             } catch (error) {
                 console.error('Forecast data load error:', error);
-                document.getElementById('forecast-chart').textContent = '예측 데이터를 불러올 수 없습니다.';
+                const el = document.getElementById('forecast-chart');
+                el.textContent = '예측 데이터를 불러올 수 없습니다.';
             }
         }
 
         function renderForecastChart(data) {
-            const chartDiv = document.getElementById('forecast-chart');
-            chartDiv.innerHTML = '';
+            const chartDiv = prepareChartDiv('forecast-chart');
+            if (!chartDiv) return;
 
             const traces = [];
             const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-                           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+                '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
 
             data.forEach((item, idx) => {
-                // 현재가 점
-                traces.push({
-                    x: ['현재'],
-                    y: [item.last_actual_price],
-                    type: 'scatter',
-                    mode: 'markers',
-                    name: item.item_name + ' (현재)',
-                    marker: { size: 10, color: colors[idx % colors.length] },
-                    showlegend: false
-                });
-
                 // 예측 라인
                 const dates = item.forecasts.map(f => f.date);
                 const prices = item.forecasts.map(f => f.price);
@@ -880,27 +970,33 @@
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: item.item_name,
-                    line: { color: colors[idx % colors.length], width: 2, dash: 'dot' },
-                    marker: { size: 6 }
+                    line: { width: 2, dash: 'dot', color: colors[idx % colors.length] },
+                    marker: { size: 6, color: colors[idx % colors.length] }
                 });
             });
 
             const layout = {
-                margin: { t: 20, r: 120, b: 50, l: 70 },
+                autosize: true,
+                margin: { t: 20, r: 20, b: 50, l: 70 },
                 xaxis: { title: '날짜' },
                 yaxis: { title: '가격 (원/kg)' },
-                legend: { x: 1.02, y: 1 },
+                legend: {
+                    orientation: 'h',  // ✅ 가로 배치로 overflow 방지
+                    x: 0.5,
+                    xanchor: 'center',
+                    y: 1.05
+                },
                 hovermode: 'x unified'
             };
 
-            Plotly.newPlot(chartDiv, traces, layout, { responsive: true });
+            Plotly.newPlot(chartDiv, traces, layout, { responsive: true, displayModeBar: false })
+                .then(() => setTimeout(() => safeResize('forecast-chart'), 30));
         }
 
         function renderForecastTable(data) {
             const tableBody = document.querySelector('#forecast-table tbody');
             tableBody.innerHTML = '';
 
-            // 변화율 기준 정렬
             const sorted = [...data].sort((a, b) => b.change_pct - a.change_pct);
 
             sorted.forEach(item => {
@@ -909,21 +1005,23 @@
                 const arrow = item.change_pct >= 0 ? '↑' : '↓';
 
                 row.innerHTML = `
-                    <td><strong>${item.item_name}</strong></td>
-                    <td>${Number(item.last_actual_price).toLocaleString()} 원</td>
-                    <td>${Number(item.predicted_price_3m).toLocaleString()} 원</td>
-                    <td class="${changeClass}">${arrow} ${Math.abs(item.change_pct)}%</td>
-                `;
+                <td><strong>${item.item_name}</strong></td>
+                <td>${Number(item.last_actual_price).toLocaleString()} 원</td>
+                <td>${Number(item.predicted_price_3m).toLocaleString()} 원</td>
+                <td class="${changeClass}">${arrow} ${Math.abs(item.change_pct)}%</td>
+            `;
                 tableBody.appendChild(row);
             });
 
             document.getElementById('forecast-summary').style.display = 'block';
         }
 
-        // 페이지 로드 시 예측 데이터 로드
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             loadForecastData();
+            // ✅ 초기 로드 시에도 한 번 리사이즈
+            setTimeout(resizeAllCharts, 200);
         });
     </script>
 </body>
+
 </html>

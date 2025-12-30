@@ -22,7 +22,9 @@
       "Bash(git push:*)",
       "Bash(chcp:*)",
       "Bash(powershell -Command:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(ls:*)",
+      "Bash(dir /ad /b \"C:\\\\Users\\\\신윤식\\\\Desktop\\\\aws_agri\")"
     ]
   }
 }
