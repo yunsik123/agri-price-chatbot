@@ -200,23 +200,39 @@ aws s3 sync frontend/ s3://<BUCKET_NAME>/
 https://d1234567890.cloudfront.net
 ```
 
-### 수동 Lambda 배포 (레거시)
+### AWS CLI 직접 배포 (권장)
+
+SAM CLI 호환성 문제 시 AWS CLI로 직접 배포합니다.
 
 ```bash
-# 패키지 생성
-mkdir -p deploy
-cp -r src lambdas/agri_api/
-cp -r data lambdas/agri_api/
-cd lambdas/agri_api
-pip install -r requirements.txt -t .
-zip -r ../../deploy/agri-api.zip .
+# 1. 배포 패키지 생성
+mkdir -p deploy_package/src deploy_package/data
+cp lambdas/agri_api/app.py deploy_package/
+cp src/*.py deploy_package/src/
+cp data/sample_agri_prices.csv deploy_package/data/
 
-# Lambda 업로드
+# 2. pydantic 의존성 설치 (Lambda용)
+pip install pydantic python-dateutil -t deploy_package/ \
+    --platform manylinux2014_x86_64 --python-version 3.10 --only-binary :all:
+
+# 3. zip 패키징 및 Lambda 업데이트
+cd deploy_package && zip -r ../lambda.zip . && cd ..
 aws lambda update-function-code \
-    --function-name agri-bedrock-chat \
-    --zip-file fileb://deploy/agri-api.zip \
+    --function-name agri-bedrock-chat-prod \
+    --zip-file fileb://lambda.zip \
     --region ap-southeast-2
+
+# 4. 프론트엔드 S3 업로드
+aws s3 cp frontend/index.html \
+    s3://agri-chatbot-frontend-260893304786-prod/index.html \
+    --region ap-southeast-2 \
+    --content-type "text/html; charset=utf-8"
+
+# 5. 정리
+rm -rf deploy_package lambda.zip
 ```
+
+> **주의**: 프론트엔드의 `API_ENDPOINT`가 절대 URL로 설정되어 있어야 S3 호스팅에서 정상 작동합니다.
 
 ## API 사용법
 

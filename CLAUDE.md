@@ -279,7 +279,62 @@ AWS_REGION=ap-southeast-2
 
 ---
 
-## I. 한계 및 다음 개선
+## I. AWS 배포 방법 (AWS CLI 직접 사용)
+
+SAM CLI가 Python 버전 호환 문제가 있을 경우, AWS CLI로 직접 배포합니다.
+
+### Lambda 배포
+
+```bash
+# 1. 배포 패키지 디렉토리 생성
+mkdir -p deploy_package/src deploy_package/data
+
+# 2. 코드 복사
+cp lambdas/agri_api/app.py deploy_package/
+cp src/*.py deploy_package/src/
+cp data/sample_agri_prices.csv deploy_package/data/
+
+# 3. pydantic 의존성 설치 (Lambda용 Linux 빌드)
+pip install pydantic python-dateutil -t deploy_package/ --platform manylinux2014_x86_64 --python-version 3.10 --only-binary :all:
+
+# 4. zip 패키징
+cd deploy_package && zip -r ../lambda.zip . && cd ..
+
+# 5. Lambda 업데이트
+aws lambda update-function-code \
+    --function-name agri-bedrock-chat-prod \
+    --zip-file fileb://lambda.zip \
+    --region ap-southeast-2
+
+# 6. 정리
+rm -rf deploy_package lambda.zip
+```
+
+### 프론트엔드 배포
+
+```bash
+# S3에 업로드 (UTF-8 인코딩 명시)
+aws s3 cp frontend/index.html \
+    s3://agri-chatbot-frontend-260893304786-prod/index.html \
+    --region ap-southeast-2 \
+    --content-type "text/html; charset=utf-8"
+```
+
+### 주의사항
+
+1. **프론트엔드 API 엔드포인트**: S3 호스팅 시 절대 URL 필요
+   ```javascript
+   // frontend/index.html 626번 줄
+   const API_ENDPOINT = 'https://xqrsjykrnb.execute-api.ap-southeast-2.amazonaws.com/prod/api/query';
+   ```
+
+2. **Lambda 의존성**: AWSSDKPandas Layer에 pydantic이 없으므로 직접 패키징 필요
+
+3. **인코딩 주의**: Windows에서 PowerShell로 파일 수정 시 UTF-8 인코딩 깨질 수 있음 → Python 사용 권장
+
+---
+
+## J. 한계 및 다음 개선
 
 - S3+Athena로 확장
 - 기상/환율 데이터 추가
