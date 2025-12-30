@@ -167,7 +167,8 @@
         .chart-area {
             height: 280px;
             width: 100%;
-            display: block;  /* flex 해제 필수! */
+            display: block;
+            /* flex 해제 필수! */
         }
 
         #forecast-chart.chart-area {
@@ -599,7 +600,7 @@
                 <button class="example-btn" onclick="sendExample(this.textContent)">감자 수미, 최근 6개월 가격 추세 보여줘</button>
                 <button class="example-btn" onclick="sendExample(this.textContent)">양파, 2019년 가격과 반입량 같이 보여줘</button>
                 <button class="example-btn" onclick="sendExample(this.textContent)">배추, 최근 3개월 변동성 큰 구간 알려줘</button>
-                <button class="example-btn" onclick="sendExample(this.textContent)">마늘, 시장별 비교해줘</button>
+                <button class="example-btn" onclick="sendExample(this.textContent)">사과, 시장별 비교해줘</button>
             </div>
 
             <!-- 채팅 메시지 -->
@@ -832,17 +833,45 @@
             const chartDiv = prepareChartDiv('price-chart');
             if (!chartDiv) return;
 
-            const dates = series.map(s => s.date);
-            const prices = series.map(s => s.price);
+            let traces = [];
+            const chartType = filters.chart_type || 'trend';
 
-            const trace = {
-                x: dates,
-                y: prices,
-                type: 'scatter',
-                mode: 'lines+markers',
-                name: '가격',
-                marker: { size: 4 }
-            };
+            if (chartType === 'compare_markets') {
+                // 시장별로 그룹핑
+                const marketGroups = {};
+                series.forEach(s => {
+                    const market = s.market_name || '기타';
+                    if (!marketGroups[market]) {
+                        marketGroups[market] = { dates: [], prices: [] };
+                    }
+                    marketGroups[market].dates.push(s.date);
+                    marketGroups[market].prices.push(s.price);
+                });
+
+                // 각 시장별로 trace 생성
+                Object.keys(marketGroups).forEach(market => {
+                    traces.push({
+                        x: marketGroups[market].dates,
+                        y: marketGroups[market].prices,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        name: market,
+                        marker: { size: 5 }
+                    });
+                });
+            } else {
+                // 기존 단일 trace
+                const dates = series.map(s => s.date);
+                const prices = series.map(s => s.price);
+                traces.push({
+                    x: dates,
+                    y: prices,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: '가격',
+                    marker: { size: 4 }
+                });
+            }
 
             const layout = {
                 autosize: true,
@@ -850,10 +879,11 @@
                 xaxis: { title: '' },
                 yaxis: { title: '원/kg' },
                 hovermode: 'x unified',
-                showlegend: false
+                showlegend: chartType === 'compare_markets',
+                legend: { orientation: 'h', y: -0.2 }
             };
 
-            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true, displayModeBar: false })
+            Plotly.newPlot(chartDiv, traces, layout, { responsive: true, displayModeBar: false })
                 .then(() => setTimeout(() => safeResize('price-chart'), 30));
         }
 
@@ -862,15 +892,41 @@
             const chartDiv = prepareChartDiv('volume-chart');
             if (!chartDiv) return;
 
-            const dates = series.map(s => s.date);
-            const volumes = series.map(s => s.volume);
+            let traces = [];
+            const chartType = filters.chart_type || 'trend';
 
-            const trace = {
-                x: dates,
-                y: volumes,
-                type: 'bar',
-                name: '반입량'
-            };
+            if (chartType === 'compare_markets') {
+                // 시장별로 그룹핑
+                const marketGroups = {};
+                series.forEach(s => {
+                    const market = s.market_name || '기타';
+                    if (!marketGroups[market]) {
+                        marketGroups[market] = { dates: [], volumes: [] };
+                    }
+                    marketGroups[market].dates.push(s.date);
+                    marketGroups[market].volumes.push(s.volume);
+                });
+
+                // 각 시장별로 trace 생성
+                Object.keys(marketGroups).forEach(market => {
+                    traces.push({
+                        x: marketGroups[market].dates,
+                        y: marketGroups[market].volumes,
+                        type: 'bar',
+                        name: market
+                    });
+                });
+            } else {
+                // 기존 단일 trace
+                const dates = series.map(s => s.date);
+                const volumes = series.map(s => s.volume);
+                traces.push({
+                    x: dates,
+                    y: volumes,
+                    type: 'bar',
+                    name: '반입량'
+                });
+            }
 
             const layout = {
                 autosize: true,
@@ -878,10 +934,12 @@
                 xaxis: { title: '' },
                 yaxis: { title: 'kg' },
                 hovermode: 'x unified',
-                showlegend: false
+                showlegend: chartType === 'compare_markets',
+                legend: { orientation: 'h', y: -0.2 },
+                barmode: chartType === 'compare_markets' ? 'group' : 'relative'
             };
 
-            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true, displayModeBar: false })
+            Plotly.newPlot(chartDiv, traces, layout, { responsive: true, displayModeBar: false })
                 .then(() => setTimeout(() => safeResize('volume-chart'), 30));
         }
 

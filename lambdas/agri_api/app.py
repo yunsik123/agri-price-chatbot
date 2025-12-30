@@ -261,7 +261,7 @@ def handler(event, context):
         ))
 
 
-# 콜드 스타트 최적화: 데이터 미리 로딩
+
 try:
     load_data()
     get_dim_dict()
