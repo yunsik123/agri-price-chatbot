@@ -517,6 +517,7 @@
             <div class="dashboard-header">
                 <span class="icon">🌾</span>
                 <h1>농산물 가격 분석 대시보드</h1>
+                <span id="today-date" style="margin-left: auto; font-size: 14px; color: #666;"></span>
             </div>
 
             <!-- 메트릭 카드 -->
@@ -1049,6 +1050,11 @@
         }
 
         document.addEventListener('DOMContentLoaded', function () {
+            // 오늘 날짜 표시
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+            document.getElementById('today-date').textContent = dateStr;
+
             loadForecastData();
             // ✅ 초기 로드 시에도 한 번 리사이즈
             setTimeout(resizeAllCharts, 200);

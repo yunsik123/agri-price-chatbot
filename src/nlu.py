@@ -427,12 +427,11 @@ def parse(
 
                     # 날짜 기본값 처리
                     if not filters_dict.get("date_from") or not filters_dict.get("date_to"):
-                        date_from, date_to = get_default_date_range(
-                            filters_dict.get("window_days", 90)
-                        )
+                        window_days = filters_dict.get("window_days", 90)
+                        date_from, date_to = get_default_date_range(window_days)
                         filters_dict["date_from"] = filters_dict.get("date_from") or date_from
                         filters_dict["date_to"] = filters_dict.get("date_to") or date_to
-                        warnings.append("기간 미지정으로 기본값을 적용했습니다.")
+                        warnings.append(f"기간 미지정으로 기본값을 적용했습니다. (최근 {window_days}일: {date_from} ~ {date_to})")
 
                     warnings.extend(parsed.get("warnings", []))
                     return {"type": "filters", "filters": filters_dict}, warnings

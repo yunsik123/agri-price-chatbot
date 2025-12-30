@@ -53,17 +53,17 @@ RECENT DATA (last 20 points):
 Please provide the analysis in Korean:"""
 
 
-FALLBACK_NARRATIVE = """분석 대상: {item_name}{variety_suffix}{market_suffix}
-기간: {date_from} ~ {date_to}
+FALLBACK_NARRATIVE = """📊 {item_name}{variety_suffix} 분석 결과{market_suffix}
 
-{trend_text}
+📅 분석 기간: {date_from} ~ {date_to}
 
-주요 지표:
+💰 주요 지표:
 • 최근 가격: {latest_price}
-• 전주 대비 변화: {wow_pct}
-• 전월 대비 변화: {mom_pct}
+• 전주 대비: {wow_pct}
+• 전월 대비: {mom_pct}
+• 변동성(14일): {volatility}
 
-{data_quality_note}"""
+{trend_text}{data_quality_note}"""
 
 
 # ============================================================
@@ -165,7 +165,8 @@ def call_llm_for_narrative(prompt: str, max_tokens: int = 512) -> str:
 def generate_narrative(
     filters: Dict,
     series: List[Dict],
-    summary: Dict
+    summary: Dict,
+    use_llm: bool = False
 ) -> str:
     """
     데이터 기반 내러티브 생성
@@ -174,6 +175,7 @@ def generate_narrative(
         filters: 필터 정보
         series: 시계열 데이터
         summary: 요약 통계
+        use_llm: LLM 사용 여부 (기본 False로 빠른 응답)
 
     Returns:
         생성된 설명 텍스트
@@ -181,6 +183,10 @@ def generate_narrative(
     # 데이터 부족 체크
     if not series or len(series) < 3:
         return generate_fallback_narrative(filters, summary, "데이터가 부족하여 상세 분석이 어렵습니다.")
+
+    # 빠른 응답을 위해 기본적으로 fallback 사용 (LLM 호출 스킵)
+    if not use_llm:
+        return generate_fallback_narrative(filters, summary)
 
     # 프롬프트 구성
     prompt = NARRATIVE_PROMPT.format(
@@ -209,27 +215,40 @@ def generate_fallback_narrative(
     summary: Dict,
     note: str = ""
 ) -> str:
-    """LLM 호출 실패 시 규칙 기반 narrative 생성"""
+    """규칙 기반 빠른 narrative 생성"""
 
     item_name = filters.get("item_name", "품목")
     variety_name = filters.get("variety_name")
     market_name = filters.get("market_name")
 
     variety_suffix = f" ({variety_name})" if variety_name else ""
-    market_suffix = f", {market_name}" if market_name else ""
+    market_suffix = f" - {market_name}" if market_name else ""
 
     # 추세 텍스트 생성
     trend_text = ""
-    if summary.get("trend_direction"):
-        trend_text = f"분석 기간 동안 가격은 {summary['trend_direction']} 추세를 보였습니다."
+    wow_pct_val = summary.get("wow_price_pct")
+    mom_pct_val = summary.get("mom_price_pct")
 
-    wow_pct = f"{summary['wow_price_pct']:+.1f}%" if summary.get("wow_price_pct") is not None else "N/A"
-    mom_pct = f"{summary['mom_price_pct']:+.1f}%" if summary.get("mom_price_pct") is not None else "N/A"
+    if wow_pct_val is not None and mom_pct_val is not None:
+        if wow_pct_val > 5:
+            trend_text = "📈 최근 가격이 상승세를 보이고 있습니다.\n"
+        elif wow_pct_val < -5:
+            trend_text = "📉 최근 가격이 하락세를 보이고 있습니다.\n"
+        else:
+            trend_text = "➡️ 가격이 비교적 안정적입니다.\n"
+    elif summary.get("trend_direction"):
+        trend_text = f"📈 분석 기간 동안 가격은 {summary['trend_direction']} 추세를 보였습니다.\n"
+
+    wow_pct = f"{wow_pct_val:+.1f}%" if wow_pct_val is not None else "N/A"
+    mom_pct = f"{mom_pct_val:+.1f}%" if mom_pct_val is not None else "N/A"
     latest_price = f"{summary['latest_price']:,.0f}원/kg" if summary.get("latest_price") else "N/A"
+    volatility = f"{summary['volatility_14d']:.0f}" if summary.get("volatility_14d") else "N/A"
 
-    data_quality_note = note or ""
-    if summary.get("missing_rate", 0) > 0.3:
-        data_quality_note = "※ 결측치 비율이 높아 분석 결과의 신뢰도가 제한적일 수 있습니다."
+    data_quality_note = ""
+    if note:
+        data_quality_note = f"\n⚠️ {note}"
+    elif summary.get("missing_rate", 0) > 0.3:
+        data_quality_note = "\n⚠️ 결측치 비율이 높아 분석 결과의 신뢰도가 제한적일 수 있습니다."
 
     return FALLBACK_NARRATIVE.format(
         item_name=item_name,
@@ -241,6 +260,7 @@ def generate_fallback_narrative(
         latest_price=latest_price,
         wow_pct=wow_pct,
         mom_pct=mom_pct,
+        volatility=volatility,
         data_quality_note=data_quality_note
     )
 
