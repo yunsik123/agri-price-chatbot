@@ -17,7 +17,12 @@
       "Bash(unzip:*)",
       "Bash(MSYS_NO_PATHCONV=1 aws logs describe-log-streams:*)",
       "Bash(MSYS_NO_PATHCONV=1 aws logs get-log-events:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(chcp:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(rm:*)"
     ]
   }
 }
