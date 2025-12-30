@@ -76,7 +76,7 @@ FILTER SCHEMA:
 - top_n_markets: integer (for compare_markets)
 - explain: boolean
 - intent: "normal" | "high_avg_price" | "high_price_change" | "high_volatility"
-- window_days: integer (default 30)
+- window_days: integer (default 30, 기준일={today}부터 N일 전 계산)
 
 DATE CONVERSION RULES:
 - "최근 N개월" = last N months from today
@@ -431,7 +431,7 @@ def parse(
                         date_from, date_to = get_default_date_range(window_days)
                         filters_dict["date_from"] = filters_dict.get("date_from") or date_from
                         filters_dict["date_to"] = filters_dict.get("date_to") or date_to
-                        warnings.append(f"기간 미지정으로 기본값을 적용했습니다. (최근 {window_days}일: {date_from} ~ {date_to})")
+                        warnings.append("기간 미지정으로 기본값을 적용했습니다. (기준일 2019-10-05에서 90일 전: 2019-07-07 ~ 2019-10-05)")
 
                     warnings.extend(parsed.get("warnings", []))
                     return {"type": "filters", "filters": filters_dict}, warnings
