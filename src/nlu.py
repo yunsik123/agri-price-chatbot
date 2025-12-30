@@ -56,6 +56,11 @@ Available market_names (시장): {market_names}
 Data date range: {date_range}
 Reference date for "최근/recent" queries: {today} (use this as "today" for calculating recent periods)
 
+⚠️ CRITICAL: Data ONLY exists from {date_range}. 
+- NEVER generate dates outside this range
+- "최근 6개월" means 6 months BEFORE {today}, NOT before current date 2025
+- Always calculate relative dates from {today} ({today}), NOT from system current date
+
 OUTPUT FORMAT (choose ONE):
 
 Option A - Confirmed filters:
@@ -375,8 +380,16 @@ def parse(
 
         return {"type": "filters", "filters": base_filters}, warnings
 
-    # 시스템 프롬프트 구성 - "today"는 데이터 마지막 날짜 사용
+    # ✅ 핵심 수정: Bedrock 호출 전에 날짜를 미리 계산
     data_max_date = date_range[1] if date_range[1] else today.strftime("%Y-%m-%d")
+    data_max_dt = datetime.strptime(data_max_date, "%Y-%m-%d")
+    
+    # 질문에서 날짜 표현 미리 파싱
+    pre_parsed_dates = parse_date_expression(question, data_max_dt)
+    date_hint = ""
+    if pre_parsed_dates[0] and pre_parsed_dates[1]:
+        date_hint = f"\n\nPRE-CALCULATED DATES for this query:\n- date_from: {pre_parsed_dates[0]}\n- date_to: {pre_parsed_dates[1]}\n(Use these exact dates in your response)"
+    
     system = SYSTEM_PROMPT.format(
         item_names=", ".join(dim_dict["item_names"][:30]),  # 너무 길면 자르기
         variety_names=", ".join(dim_dict["variety_names"][:50]),
@@ -385,7 +398,7 @@ def parse(
         today=data_max_date  # 데이터 마지막 날짜를 기준으로 사용
     )
 
-    user_prompt = USER_PROMPT_TEMPLATE.format(question=question)
+    user_prompt = USER_PROMPT_TEMPLATE.format(question=question) + date_hint
     full_prompt = f"{system}\n\n{user_prompt}"
 
     # LLM 호출 및 재시도
@@ -431,7 +444,7 @@ def parse(
                         date_from, date_to = get_default_date_range(window_days)
                         filters_dict["date_from"] = filters_dict.get("date_from") or date_from
                         filters_dict["date_to"] = filters_dict.get("date_to") or date_to
-                        warnings.append("기간 미지정으로 기본값을 적용했습니다. (기준일 2019-10-05에서 90일 전: 2019-07-07 ~ 2019-10-05)")
+                        warnings.append("기간 미지정으로 기본값 90일전을  적용했습니다. ")
 
                     warnings.extend(parsed.get("warnings", []))
                     return {"type": "filters", "filters": filters_dict}, warnings

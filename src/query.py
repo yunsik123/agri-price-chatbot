@@ -81,6 +81,13 @@ def apply_filters(df: pd.DataFrame, filters: Dict) -> Tuple[pd.DataFrame, List[s
                 date_to = data_max_str
             else:
                 date_from_dt = data_max_dt - pd.Timedelta(days=180)  # 기본 6개월
+                date_to = data_max_str
+            # 보정된 날짜를 문자열로 업데이트
+            date_from = date_from_dt.strftime("%Y-%m-%d")
+        result = result[result["date"] >= date_from_dt]
+    elif date_from:
+        # data_max_dt가 없는 경우에도 처리
+        date_from_dt = pd.to_datetime(date_from)
         result = result[result["date"] >= date_from_dt]
 
     if date_to and data_max_dt:
