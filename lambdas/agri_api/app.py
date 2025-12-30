@@ -1,11 +1,14 @@
 """
 Lambda 핸들러: 농산물 가격 분석 API
 - 자연어 질문 → 필터 추출 → 데이터 조회 → 요약/설명 생성
+- 가격 예측 API
 """
 import json
 import uuid
 import sys
 import os
+import boto3
+from io import StringIO
 
 # Lambda 환경에서 src 모듈 경로 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -25,9 +28,80 @@ from src.data_loader import load_data, get_dim_dict
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "content-type",
-    "Access-Control-Allow-Methods": "OPTIONS,POST",
+    "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
     "Content-Type": "application/json"
 }
+
+# S3 설정 (예측 데이터)
+FORECAST_BUCKET = 'agri-sagemaker-data-260893304786'
+FORECAST_KEY = 'forecasts/forecast_results.csv'
+REGION = 'ap-southeast-2'
+
+# 예측 데이터 캐시
+_forecast_cache = None
+
+
+def load_forecast_data():
+    """S3에서 예측 데이터 로드"""
+    global _forecast_cache
+
+    if _forecast_cache is not None:
+        return _forecast_cache
+
+    try:
+        s3 = boto3.client('s3', region_name=REGION)
+        response = s3.get_object(Bucket=FORECAST_BUCKET, Key=FORECAST_KEY)
+        csv_content = response['Body'].read().decode('utf-8-sig')
+
+        # CSV 파싱
+        import csv
+        reader = csv.DictReader(StringIO(csv_content))
+        _forecast_cache = list(reader)
+        return _forecast_cache
+    except Exception as e:
+        print(f"Forecast data load error: {e}")
+        return []
+
+
+def get_forecast_summary():
+    """품목별 예측 요약"""
+    data = load_forecast_data()
+    if not data:
+        return []
+
+    # 품목별 그룹화
+    items = {}
+    for row in data:
+        item_name = row['item_name']
+        if item_name not in items:
+            items[item_name] = {
+                'item_name': item_name,
+                'last_actual_price': float(row['last_actual_price']),
+                'forecasts': []
+            }
+        items[item_name]['forecasts'].append({
+            'date': row['forecast_date'],
+            'price': float(row['predicted_price'])
+        })
+
+    # 요약 생성
+    result = []
+    for item_name, item_data in items.items():
+        forecasts = item_data['forecasts']
+        last_price = item_data['last_actual_price']
+        final_price = forecasts[-1]['price'] if forecasts else last_price
+
+        change_pct = ((final_price - last_price) / last_price * 100) if last_price > 0 else 0
+
+        result.append({
+            'item_name': item_name,
+            'last_actual_price': last_price,
+            'predicted_price_3m': final_price,
+            'change_pct': round(change_pct, 1),
+            'forecasts': forecasts
+        })
+
+    return result
 
 
 def create_response(status_code: int, body: dict) -> dict:
@@ -43,6 +117,10 @@ def handler(event, context):
     """
     Lambda 메인 핸들러
 
+    엔드포인트:
+    - POST /api/query: 자연어 질문 처리
+    - GET /api/forecast: 가격 예측 데이터
+
     입력 형태:
     A) {"question": "..."} - 자연어
     B) {"filters": {...}} - 필터 직접 지정
@@ -51,10 +129,22 @@ def handler(event, context):
     request_id = str(uuid.uuid4())
 
     try:
-        # OPTIONS 요청 처리 (CORS preflight)
+        # HTTP 메서드 및 경로 확인
         http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method", "")
+        path = event.get("path") or event.get("rawPath") or ""
+
+        # OPTIONS 요청 처리 (CORS preflight)
         if http_method == "OPTIONS":
             return create_response(200, {"message": "OK"})
+
+        # 예측 API 처리
+        if "/forecast" in path and http_method == "GET":
+            forecasts = get_forecast_summary()
+            return create_response(200, {
+                "type": "forecast",
+                "data": forecasts,
+                "request_id": request_id
+            })
 
         # 요청 본문 파싱
         body = event.get("body", "{}")

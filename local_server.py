@@ -161,6 +161,76 @@ async def health():
     return {"status": "healthy", "version": "1.0.0"}
 
 
+@app.get("/api/forecast")
+async def forecast():
+    """가격 예측 데이터 조회"""
+    import csv
+    from io import StringIO
+
+    request_id = str(uuid.uuid4())
+
+    try:
+        # 로컬 예측 파일 읽기
+        forecast_path = Path(__file__).parent / "data" / "forecast_results.csv"
+
+        if not forecast_path.exists():
+            return JSONResponse(
+                status_code=404,
+                content={"error": {"code": "NO_FORECAST", "message": "예측 데이터 파일이 없습니다."}}
+            )
+
+        # CSV 읽기
+        with open(forecast_path, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            data = list(reader)
+
+        # 품목별 그룹화
+        items = {}
+        for row in data:
+            item_name = row['item_name']
+            if item_name not in items:
+                items[item_name] = {
+                    'item_name': item_name,
+                    'last_actual_price': float(row['last_actual_price']),
+                    'forecasts': []
+                }
+            items[item_name]['forecasts'].append({
+                'date': row['forecast_date'],
+                'price': float(row['predicted_price'])
+            })
+
+        # 요약 생성
+        result = []
+        for item_name, item_data in items.items():
+            forecasts = item_data['forecasts']
+            last_price = item_data['last_actual_price']
+            final_price = forecasts[-1]['price'] if forecasts else last_price
+
+            change_pct = ((final_price - last_price) / last_price * 100) if last_price > 0 else 0
+
+            result.append({
+                'item_name': item_name,
+                'last_actual_price': last_price,
+                'predicted_price_3m': final_price,
+                'change_pct': round(change_pct, 1),
+                'forecasts': forecasts
+            })
+
+        return {
+            "type": "forecast",
+            "data": result,
+            "request_id": request_id
+        }
+
+    except Exception as e:
+        import traceback
+        print(f"Forecast Error: {traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": {"code": "INTERNAL_ERROR", "message": str(e)}}
+        )
+
+
 @app.get("/api/dimensions")
 async def dimensions():
     """품목/품종/시장 목록"""

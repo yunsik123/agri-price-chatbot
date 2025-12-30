@@ -2,7 +2,7 @@
 
 ## 프로젝트 개요
 - **리전**: ap-southeast-2
-- **Bedrock 모델**: amazon.titan-text-express-v1 (Claude 계열 사용 안함)
+- **Bedrock 모델**: amazon.nova-micro-v1:0 (Amazon Nova Micro)
 - **Lambda**: agri-bedrock-chat-prod (Python 3.10, Timeout 30초, 512MB)
 - **아키텍처**: Serverless (S3 + API Gateway + Lambda + Bedrock)
 

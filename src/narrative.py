@@ -20,7 +20,7 @@ def get_bedrock_client():
     return _bedrock_client
 
 
-MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.titan-text-express-v1")
+MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-micro-v1:0")
 
 
 # ============================================================
@@ -124,20 +124,20 @@ def prepare_recent_data(series: List[Dict], limit: int = 20) -> str:
 
 
 # ============================================================
-# Titan 호출
+# Nova 호출
 # ============================================================
 
-def call_titan_for_narrative(prompt: str, max_tokens: int = 512) -> str:
-    """Bedrock Titan 호출하여 narrative 생성"""
+def call_llm_for_narrative(prompt: str, max_tokens: int = 512) -> str:
+    """Bedrock Nova 호출하여 narrative 생성"""
     client = get_bedrock_client()
 
     body = {
-        "inputText": prompt,
-        "textGenerationConfig": {
-            "maxTokenCount": max_tokens,
-            "temperature": 0.3,
-            "topP": 0.9,
-            "stopSequences": []
+        "messages": [
+            {"role": "user", "content": [{"text": prompt}]}
+        ],
+        "inferenceConfig": {
+            "maxTokens": max_tokens,
+            "temperature": 0.3
         }
     }
 
@@ -150,7 +150,7 @@ def call_titan_for_narrative(prompt: str, max_tokens: int = 512) -> str:
         )
 
         result = json.loads(response["body"].read())
-        output_text = result.get("results", [{}])[0].get("outputText", "")
+        output_text = result.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
         return output_text.strip()
 
     except Exception as e:
@@ -194,8 +194,8 @@ def generate_narrative(
         recent_data=prepare_recent_data(series, limit=20)
     )
 
-    # Titan 호출
-    narrative = call_titan_for_narrative(prompt)
+    # Claude 호출
+    narrative = call_llm_for_narrative(prompt)
 
     # 빈 응답이면 fallback
     if not narrative or len(narrative) < 20:

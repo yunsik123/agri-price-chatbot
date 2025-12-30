@@ -142,6 +142,10 @@ Resources:
                 - logs:CreateLogStream
                 - logs:PutLogEvents
               Resource: '*'
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: 'arn:aws:s3:::agri-sagemaker-data-*/*'
       Events:
         ApiQuery:
           Type: Api
@@ -154,6 +158,18 @@ Resources:
           Properties:
             RestApiId: !Ref AgriApi
             Path: /api/query
+            Method: OPTIONS
+        ApiForecast:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AgriApi
+            Path: /api/forecast
+            Method: GET
+        ApiForecastOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AgriApi
+            Path: /api/forecast
             Method: OPTIONS
 
   # ============================================================

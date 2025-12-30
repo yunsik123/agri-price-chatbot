@@ -34,7 +34,7 @@ def get_bedrock_client():
     return _bedrock_client
 
 
-MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.titan-text-express-v1")
+MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-micro-v1:0")
 
 
 # ============================================================
@@ -254,20 +254,20 @@ def rule_based_fallback(question: str) -> Tuple[Dict, List[str]]:
 
 
 # ============================================================
-# Bedrock Titan 호출
+# Bedrock Nova 호출
 # ============================================================
 
-def call_titan(prompt: str, max_tokens: int = 1024) -> str:
-    """Bedrock Titan 모델 호출"""
+def call_llm(prompt: str, max_tokens: int = 1024) -> str:
+    """Bedrock Nova 모델 호출"""
     client = get_bedrock_client()
 
     body = {
-        "inputText": prompt,
-        "textGenerationConfig": {
-            "maxTokenCount": max_tokens,
-            "temperature": 0.1,
-            "topP": 0.9,
-            "stopSequences": []
+        "messages": [
+            {"role": "user", "content": [{"text": prompt}]}
+        ],
+        "inferenceConfig": {
+            "maxTokens": max_tokens,
+            "temperature": 0.1
         }
     }
 
@@ -279,7 +279,7 @@ def call_titan(prompt: str, max_tokens: int = 1024) -> str:
     )
 
     result = json.loads(response["body"].read())
-    output_text = result.get("results", [{}])[0].get("outputText", "")
+    output_text = result.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
     return output_text.strip()
 
 
@@ -393,7 +393,7 @@ def parse(
                     question=question
                 )
 
-            response_text = call_titan(full_prompt)
+            response_text = call_llm(full_prompt)
             parsed = extract_json_from_response(response_text)
 
             if not parsed:

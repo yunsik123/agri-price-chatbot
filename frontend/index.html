@@ -375,6 +375,47 @@
             40% { transform: scale(1); }
         }
 
+        /* 예측 테이블 */
+        .forecast-summary {
+            background: #fafafa;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #eee;
+        }
+
+        .forecast-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .forecast-table th,
+        .forecast-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .forecast-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+            color: #444;
+        }
+
+        .forecast-table tr:hover {
+            background: #f9f9f9;
+        }
+
+        .change-up {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .change-down {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
         /* 반응형 */
         @media (max-width: 1200px) {
             .container {
@@ -434,6 +475,30 @@
                         <div class="chart-title">📊 반입량</div>
                         <div id="volume-chart" class="chart-placeholder">질문을 입력하면 차트가 표시됩니다</div>
                     </div>
+                </div>
+
+                <!-- 예측 차트 섹션 -->
+                <div class="chart-row" id="forecast-section">
+                    <div class="chart-box" style="grid-column: span 2;">
+                        <div class="chart-title">🔮 3개월 가격 예측 (XGBoost)</div>
+                        <div id="forecast-chart" class="chart-placeholder">예측 데이터 로딩 중...</div>
+                    </div>
+                </div>
+
+                <!-- 예측 요약 테이블 -->
+                <div class="forecast-summary" id="forecast-summary" style="display: none;">
+                    <div class="chart-title">📋 품목별 예측 요약</div>
+                    <table class="forecast-table" id="forecast-table">
+                        <thead>
+                            <tr>
+                                <th>품목</th>
+                                <th>현재가</th>
+                                <th>3개월 후 예측</th>
+                                <th>변화율</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
 
@@ -761,6 +826,104 @@
         function handleKeyPress(e) {
             if (e.key === 'Enter') sendMessage();
         }
+
+        // ========================================
+        // 예측 데이터 관련 함수
+        // ========================================
+
+        let forecastData = null;
+
+        async function loadForecastData() {
+            try {
+                const forecastEndpoint = API_ENDPOINT.replace('/query', '/forecast');
+                const response = await fetch(forecastEndpoint);
+                const data = await response.json();
+
+                if (data.type === 'forecast' && data.data) {
+                    forecastData = data.data;
+                    renderForecastChart(forecastData);
+                    renderForecastTable(forecastData);
+                }
+            } catch (error) {
+                console.error('Forecast data load error:', error);
+                document.getElementById('forecast-chart').textContent = '예측 데이터를 불러올 수 없습니다.';
+            }
+        }
+
+        function renderForecastChart(data) {
+            const chartDiv = document.getElementById('forecast-chart');
+            chartDiv.innerHTML = '';
+
+            const traces = [];
+            const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+                           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+
+            data.forEach((item, idx) => {
+                // 현재가 점
+                traces.push({
+                    x: ['현재'],
+                    y: [item.last_actual_price],
+                    type: 'scatter',
+                    mode: 'markers',
+                    name: item.item_name + ' (현재)',
+                    marker: { size: 10, color: colors[idx % colors.length] },
+                    showlegend: false
+                });
+
+                // 예측 라인
+                const dates = item.forecasts.map(f => f.date);
+                const prices = item.forecasts.map(f => f.price);
+
+                traces.push({
+                    x: dates,
+                    y: prices,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: item.item_name,
+                    line: { color: colors[idx % colors.length], width: 2, dash: 'dot' },
+                    marker: { size: 6 }
+                });
+            });
+
+            const layout = {
+                margin: { t: 20, r: 120, b: 50, l: 70 },
+                xaxis: { title: '날짜' },
+                yaxis: { title: '가격 (원/kg)' },
+                legend: { x: 1.02, y: 1 },
+                hovermode: 'x unified'
+            };
+
+            Plotly.newPlot(chartDiv, traces, layout, { responsive: true });
+        }
+
+        function renderForecastTable(data) {
+            const tableBody = document.querySelector('#forecast-table tbody');
+            tableBody.innerHTML = '';
+
+            // 변화율 기준 정렬
+            const sorted = [...data].sort((a, b) => b.change_pct - a.change_pct);
+
+            sorted.forEach(item => {
+                const row = document.createElement('tr');
+                const changeClass = item.change_pct >= 0 ? 'change-up' : 'change-down';
+                const arrow = item.change_pct >= 0 ? '↑' : '↓';
+
+                row.innerHTML = `
+                    <td><strong>${item.item_name}</strong></td>
+                    <td>${Number(item.last_actual_price).toLocaleString()} 원</td>
+                    <td>${Number(item.predicted_price_3m).toLocaleString()} 원</td>
+                    <td class="${changeClass}">${arrow} ${Math.abs(item.change_pct)}%</td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            document.getElementById('forecast-summary').style.display = 'block';
+        }
+
+        // 페이지 로드 시 예측 데이터 로드
+        document.addEventListener('DOMContentLoaded', function() {
+            loadForecastData();
+        });
     </script>
 </body>
 </html>
