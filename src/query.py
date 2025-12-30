@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
-from .data_loader import load_data
+from .data_loader import load_data, get_data_date_range
 from .schema import FilterRequest, SeriesPoint
 
 
@@ -59,16 +59,34 @@ def apply_filters(df: pd.DataFrame, filters: Dict) -> Tuple[pd.DataFrame, List[s
             if variety_name:
                 result = result[result["variety_name"] == variety_name]
 
-    # 날짜 범위 필터
+    # 날짜 범위 필터 (데이터 범위 벗어나면 자동 보정)
     date_from = filters.get("date_from")
     date_to = filters.get("date_to")
 
-    if date_from:
+    # 데이터 범위 확인
+    data_min_str, data_max_str = get_data_date_range()
+    data_min_dt = pd.to_datetime(data_min_str) if data_min_str else None
+    data_max_dt = pd.to_datetime(data_max_str) if data_max_str else None
+
+    if date_from and data_max_dt:
         date_from_dt = pd.to_datetime(date_from)
+        # 요청 기간이 데이터 범위를 완전히 벗어나면 자동 보정
+        if date_from_dt > data_max_dt:
+            warnings.append(f"요청 기간({date_from})이 데이터 범위({data_max_str})를 벗어나 최근 데이터로 보정했습니다.")
+            # 데이터 마지막 날짜 기준으로 동일한 기간만큼 앞으로 이동
+            if date_to:
+                date_to_dt = pd.to_datetime(date_to)
+                period_days = (date_to_dt - date_from_dt).days
+                date_from_dt = data_max_dt - pd.Timedelta(days=period_days)
+                date_to = data_max_str
+            else:
+                date_from_dt = data_max_dt - pd.Timedelta(days=180)  # 기본 6개월
         result = result[result["date"] >= date_from_dt]
 
-    if date_to:
+    if date_to and data_max_dt:
         date_to_dt = pd.to_datetime(date_to)
+        if date_to_dt > data_max_dt:
+            date_to_dt = data_max_dt
         result = result[result["date"] <= date_to_dt]
 
     if len(result) == 0:

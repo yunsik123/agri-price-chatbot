@@ -54,7 +54,7 @@ Available variety_names (품종): {variety_names}
 Available market_names (시장): {market_names}
 
 Data date range: {date_range}
-Today's date: {today}
+Reference date for "최근/recent" queries: {today} (use this as "today" for calculating recent periods)
 
 OUTPUT FORMAT (choose ONE):
 
@@ -113,13 +113,18 @@ def parse_date_expression(text: str, today: datetime = None) -> Tuple[Optional[s
     자연어 날짜 표현을 (date_from, date_to) 튜플로 변환
 
     Examples:
-        "최근 6개월" → (6개월 전, 오늘)
+        "최근 6개월" → (6개월 전, 데이터 마지막 날짜)
         "작년" → (작년 1월 1일, 작년 12월 31일)
         "2019년" → (2019-01-01, 2019-12-31)
-        "최근 한달" → (30일 전, 오늘)
+        "최근 한달" → (30일 전, 데이터 마지막 날짜)
     """
     if today is None:
-        today = datetime.now()
+        # 데이터의 마지막 날짜를 기준으로 사용 (실제 오늘 날짜가 아닌)
+        _, max_date_str = get_data_date_range()
+        if max_date_str:
+            today = datetime.strptime(max_date_str, "%Y-%m-%d")
+        else:
+            today = datetime.now()
 
     # 최근 N개월
     match = re.search(r"최근\s*(\d+)\s*개월", text)
@@ -370,13 +375,14 @@ def parse(
 
         return {"type": "filters", "filters": base_filters}, warnings
 
-    # 시스템 프롬프트 구성
+    # 시스템 프롬프트 구성 - "today"는 데이터 마지막 날짜 사용
+    data_max_date = date_range[1] if date_range[1] else today.strftime("%Y-%m-%d")
     system = SYSTEM_PROMPT.format(
         item_names=", ".join(dim_dict["item_names"][:30]),  # 너무 길면 자르기
         variety_names=", ".join(dim_dict["variety_names"][:50]),
         market_names=", ".join(dim_dict["market_names"][:20]),
         date_range=f"{date_range[0]} ~ {date_range[1]}",
-        today=today.strftime("%Y-%m-%d")
+        today=data_max_date  # 데이터 마지막 날짜를 기준으로 사용
     )
 
     user_prompt = USER_PROMPT_TEMPLATE.format(question=question)

@@ -626,6 +626,7 @@
 
         let currentQuestion = '';
         let isLoading = false;
+        let currentItemName = null;  // 현재 조회 중인 품목명 (예측 차트 하이라이트용)
 
         // ✅ plotly resize helper (차트가 컨테이너 밖으로 튀는 현상 방지)
         function safeResize(divId) {
@@ -701,6 +702,15 @@
             const series = data.series || [];
             const summary = data.summary || {};
             const narrative = data.narrative || '';
+
+            // 현재 조회 품목 저장 (예측 차트 하이라이트용)
+            if (filters.item_name) {
+                currentItemName = filters.item_name;
+                // 예측 차트 다시 렌더링 (하이라이트 적용)
+                if (forecastData) {
+                    renderForecastChart(forecastData, currentItemName);
+                }
+            }
 
             updateMetrics(summary);
 
@@ -951,7 +961,7 @@
             }
         }
 
-        function renderForecastChart(data) {
+        function renderForecastChart(data, highlightItem = null) {
             const chartDiv = prepareChartDiv('forecast-chart');
             if (!chartDiv) return;
 
@@ -959,21 +969,42 @@
             const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
                 '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
 
+            // 하이라이트 품목이 있으면 해당 품목을 먼저 그리고, 나머지는 흐리게
+            const hasHighlight = highlightItem && data.some(d => d.item_name === highlightItem);
+
             data.forEach((item, idx) => {
-                // 예측 라인
                 const dates = item.forecasts.map(f => f.date);
                 const prices = item.forecasts.map(f => f.price);
+
+                const isHighlighted = hasHighlight && item.item_name === highlightItem;
+                const opacity = hasHighlight ? (isHighlighted ? 1.0 : 0.2) : 1.0;
+                const lineWidth = isHighlighted ? 4 : 2;
+                const markerSize = isHighlighted ? 10 : 6;
 
                 traces.push({
                     x: dates,
                     y: prices,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: item.item_name,
-                    line: { width: 2, dash: 'dot', color: colors[idx % colors.length] },
-                    marker: { size: 6, color: colors[idx % colors.length] }
+                    name: item.item_name + (isHighlighted ? ' ★' : ''),
+                    line: {
+                        width: lineWidth,
+                        dash: isHighlighted ? 'solid' : 'dot',
+                        color: colors[idx % colors.length]
+                    },
+                    marker: { size: markerSize, color: colors[idx % colors.length] },
+                    opacity: opacity
                 });
             });
+
+            // 하이라이트된 품목을 맨 위로 (마지막에 그려지도록)
+            if (hasHighlight) {
+                traces.sort((a, b) => {
+                    const aHigh = a.name.includes('★') ? 1 : 0;
+                    const bHigh = b.name.includes('★') ? 1 : 0;
+                    return aHigh - bHigh;
+                });
+            }
 
             const layout = {
                 autosize: true,
@@ -981,12 +1012,13 @@
                 xaxis: { title: '날짜' },
                 yaxis: { title: '가격 (원/kg)' },
                 legend: {
-                    orientation: 'h',  // ✅ 가로 배치로 overflow 방지
+                    orientation: 'h',
                     x: 0.5,
                     xanchor: 'center',
                     y: 1.05
                 },
-                hovermode: 'x unified'
+                hovermode: 'x unified',
+                title: hasHighlight ? { text: `📌 ${highlightItem} 가격 예측`, font: { size: 14 } } : null
             };
 
             Plotly.newPlot(chartDiv, traces, layout, { responsive: true, displayModeBar: false })
