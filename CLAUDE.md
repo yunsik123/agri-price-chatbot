@@ -58,7 +58,7 @@
 │                      Lambda Function                             │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐ │
 │  │   NLU    │→ │  Query   │→ │ Features │→ │    Narrative     │ │
-│  │(Bedrock) │  │(pandas)  │  │(summary) │  │   (Bedrock)      │ │
+│  │(Bedrock) │  │(pandas)  │  │(summary) │  │  (규칙 기반)      │ │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────────────┘ │
 │                      │                                           │
 │              ┌───────▼───────┐                                   │
@@ -70,7 +70,7 @@
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Amazon Bedrock                                │
-│                 (Titan Text Express v1)                          │
+│                   (Amazon Nova Micro)                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -88,11 +88,15 @@ aws_agri/
 │   ├── data_loader.py      # CSV 로딩/컬럼 매핑/캐싱
 │   ├── query.py            # 필터→데이터프레임 필터링/집계
 │   ├── features.py         # WoW/MoM/변동성/급등락 등 요약지표 생성
-│   └── narrative.py        # series/summary 기반 설명 프롬프트 + Titan 호출
+│   └── narrative.py        # 규칙 기반 빠른 설명 생성 (LLM 호출 스킵)
+├── scripts/
+│   └── local_forecast.py   # XGBoost 예측 + S3 업로드
 ├── streamlit_app/
 │   └── app.py              # Streamlit 대시보드 (레거시)
 ├── tests/                  # pytest 테스트
-├── data/                   # CSV 데이터
+├── data/
+│   ├── sample_agri_prices.csv    # 원본 가격 데이터
+│   └── forecast_results.csv      # 예측 결과
 ├── local_server.py         # 로컬 개발 서버 (FastAPI)
 ├── deploy_aws.ps1          # AWS 배포 스크립트
 ├── template.yaml           # SAM 템플릿
@@ -251,13 +255,31 @@ COLUMN_MAPPING = {
 
 ```
 DATA_PATH=/var/task/data/sample_agri_prices.csv
-BEDROCK_MODEL_ID=amazon.titan-text-express-v1
+BEDROCK_MODEL_ID=amazon.nova-micro-v1:0
 AWS_REGION=ap-southeast-2
 ```
 
 ---
 
-## H. 한계 및 다음 개선
+## H. 주요 기능 및 최적화
+
+### 응답 속도 최적화
+- Narrative 생성 시 LLM 호출 스킵 → 규칙 기반 빠른 응답
+- NLU에만 LLM 사용 (필터 추출), 설명은 규칙 기반 생성
+- 예상 응답 시간: 1-3초 (기존 4-10초에서 개선)
+
+### 대시보드 UX
+- 제목 옆에 오늘 날짜 표시
+- 기본값 메시지에 실제 기간 표시 (예: "최근 90일: 2019-07-05 ~ 2019-10-05")
+- 3개월 가격 예측 차트 및 요약 테이블
+
+### 가격 예측 (XGBoost)
+- scripts/local_forecast.py 실행 → data/forecast_results.csv 생성
+- S3에 업로드하여 Lambda에서 조회
+
+---
+
+## I. 한계 및 다음 개선
 
 - S3+Athena로 확장
 - 기상/환율 데이터 추가
